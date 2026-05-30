@@ -1,0 +1,4 @@
+2026-05-29 10:15:21,456 ERROR service=order-service trace_id=trc-9f2a request_id=req-1001 status=504
+Downstream call failed: ReadTimeoutException: timeout while calling inventory-service after 3000ms
+at client.InventoryClient.getInventory(InventoryClient.java:88)
+retry attempt=2 region=ap-southeast-1

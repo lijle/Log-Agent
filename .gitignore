@@ -1,0 +1,10 @@
+.venv/
+.idea/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+
+db/*.db
+!db/.gitkeep
+
+.env

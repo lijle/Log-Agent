@@ -1,0 +1,4 @@
+2026-05-29 11:02:09,102 ERROR service=payment-service correlation_id=corr-77aa92
+Unhandled exception: NullPointerException: cannot read field "amount" because "paymentRequest" is null
+at service.PaymentProcessor.process(PaymentProcessor.java:41)
+user_id=u-991
