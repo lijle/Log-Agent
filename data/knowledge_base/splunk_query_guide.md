@@ -1,13 +1,13 @@
-# Splunk-like Query Guide
+# Splunk 风格查询指南
 
-## Query Ideas
+## 查询思路
 
-- search by service and exception keywords
-- narrow by trace id or request id
-- group by status code and host
+- 优先按服务名和异常关键词检索
+- 再通过 trace id 或 request id 缩小范围
+- 最后按状态码、主机或实例维度聚合
 
-## Checklist
+## 排查清单
 
-1. use exact exception names first
-2. expand with wildcard keywords if needed
-3. aggregate volume to identify whether the issue is isolated or widespread
+1. 先使用精确的异常名，避免结果过杂
+2. 必要时再放宽为模糊关键词或通配查询
+3. 聚合错误量，判断问题是偶发还是大面积爆发

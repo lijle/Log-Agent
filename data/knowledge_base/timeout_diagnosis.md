@@ -1,20 +1,20 @@
-# Timeout Diagnosis Guide
+# 超时问题诊断指南
 
-## Common Signals
+## 常见信号
 
-- Read timeout
-- HTTP 504 or gateway timeout
-- repeated retry attempts for the same trace id
+- `ReadTimeoutException` 或其他超时类异常
+- `HTTP 504` 或 gateway timeout
+- 同一个 trace id 出现多次重试
 
-## Common Root Causes
+## 常见根因
 
-- downstream dependency latency spike
-- network jitter between services
-- timeout threshold is too low for current traffic
+- 下游依赖响应延迟突增
+- 服务间网络抖动或丢包
+- 当前超时阈值不适合现有流量和调用链路
 
-## Recommended Checks
+## 推荐检查项
 
-1. compare upstream and downstream latency percentiles
-2. inspect error rate changes during the same time window
-3. check recent deployment or configuration changes
-4. verify retry count and timeout configuration
+1. 对比上下游接口的延迟分位数
+2. 查看同一时间窗口内的错误率变化
+3. 检查最近发布或配置变更
+4. 核对重试次数和超时参数设置

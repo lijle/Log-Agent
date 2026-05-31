@@ -26,6 +26,16 @@ STATUS_PATTERNS = [
 
 
 def _first_match(patterns: list[str], text: str) -> str | None:
+    """按顺序尝试多个正则，返回第一个命中的值。
+
+    输入：
+    - patterns：正则模式列表
+    - text：待匹配的日志文本
+
+    输出：
+    - str | None：命中的捕获组或完整匹配结果；若未命中则返回 None
+    """
+
     for pattern in patterns:
         match = re.search(pattern, text, flags=re.IGNORECASE)
         if match:
@@ -34,28 +44,82 @@ def _first_match(patterns: list[str], text: str) -> str | None:
 
 
 def _extract_timestamp(text: str) -> str | None:
+    """提取日志中的时间戳字段。
+
+    输入：
+    - text：原始日志文本
+
+    输出：
+    - str | None：提取到的时间字符串
+    """
+
     return _first_match(TIMESTAMP_PATTERNS, text)
 
 
 def _extract_level(text: str) -> str | None:
+    """提取日志级别。
+
+    输入：
+    - text：原始日志文本
+
+    输出：
+    - str | None：如 ERROR、WARN、INFO；未命中则返回 None
+    """
+
     match = re.search(LEVEL_PATTERN, text, flags=re.IGNORECASE)
     return match.group(1).upper() if match else None
 
 
 def _extract_service(text: str) -> str | None:
+    """提取服务名。
+
+    输入：
+    - text：原始日志文本
+
+    输出：
+    - str | None：服务名，如 `order-service`
+    """
+
     return _first_match(SERVICE_PATTERNS, text)
 
 
 def _extract_trace_id(text: str) -> str | None:
+    """提取 trace_id / request_id / correlation_id。
+
+    输入：
+    - text：原始日志文本
+
+    输出：
+    - str | None：请求链路标识
+    """
+
     return _first_match(TRACE_PATTERNS, text)
 
 
 def _extract_exception(text: str) -> str | None:
+    """提取异常类型。
+
+    输入：
+    - text：原始日志文本
+
+    输出：
+    - str | None：如 `ReadTimeoutException`
+    """
+
     match = re.search(EXCEPTION_PATTERN, text)
     return match.group(1) if match else None
 
 
 def _extract_status_code(text: str) -> int | None:
+    """提取 HTTP 状态码。
+
+    输入：
+    - text：原始日志文本
+
+    输出：
+    - int | None：100 到 599 之间的状态码
+    """
+
     for pattern in STATUS_PATTERNS:
         match = re.search(pattern, text, flags=re.IGNORECASE)
         if not match:
@@ -71,6 +135,19 @@ def _extract_status_code(text: str) -> int | None:
 
 
 def _extract_error_message(text: str) -> str | None:
+    """提取最像错误描述的日志消息。
+
+    作用：
+    - 优先查找包含 exception/failed/timeout 等关键词的行
+    - 如果没有，再退化到 error/warn/fatal 行
+
+    输入：
+    - text：原始日志文本
+
+    输出：
+    - str | None：错误消息文本
+    """
+
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     priority_tokens = ["exception", "failed", "timeout", "denied", "not available", "unauthorized"]
     error_like = [
@@ -90,6 +167,20 @@ def _extract_error_message(text: str) -> str | None:
 
 
 def parse_log(raw_log: str) -> dict[str, Any]:
+    """把原始日志解析成结构化结果。
+
+    作用：
+    - 提取关键字段
+    - 生成紧凑摘要
+    - 保留前几行证据，方便报告和 UI 展示
+
+    输入：
+    - raw_log：原始日志文本
+
+    输出：
+    - dict[str, Any]：包含 extracted_fields、log_summary、evidence_lines
+    """
+
     text = raw_log.strip()
     extracted_fields = {
         "timestamp": _extract_timestamp(text),

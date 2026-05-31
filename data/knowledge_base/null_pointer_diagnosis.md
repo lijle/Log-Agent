@@ -1,19 +1,19 @@
-# Null Pointer Diagnosis Guide
+# 空指针问题诊断指南
 
-## Common Signals
+## 常见信号
 
-- NullPointerException
-- object field access on missing input
-- exception happens in service business logic
+- `NullPointerException`
+- 访问了缺失输入对应的对象字段
+- 异常发生在服务业务逻辑处理中
 
-## Common Root Causes
+## 常见根因
 
-- missing null validation
-- unexpected empty request body or missing fields
-- object not initialized in exceptional path
+- 缺少空值校验
+- 请求体为空，或关键字段缺失
+- 异常路径中的对象没有被正确初始化
 
-## Recommended Checks
+## 推荐检查项
 
-1. inspect the input payload shape
-2. add guard clauses around nullable fields
-3. confirm upstream contract changes
+1. 检查输入参数结构和字段完整性
+2. 给可空字段增加保护性判断
+3. 确认上游接口契约是否刚发生变化

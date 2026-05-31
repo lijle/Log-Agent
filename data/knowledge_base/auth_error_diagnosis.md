@@ -1,19 +1,19 @@
-# Authentication Error Diagnosis Guide
+# 鉴权问题诊断指南
 
-## Common Signals
+## 常见信号
 
-- 401 unauthorized
-- invalid token signature
-- token expired or missing permission
+- `401 unauthorized`
+- token 签名无效
+- token 过期、缺少权限或 scope 不匹配
 
-## Common Root Causes
+## 常见根因
 
-- expired or malformed bearer token
-- permission scope mismatch
-- auth service clock skew or verification failure
+- Bearer Token 过期、缺失或格式错误
+- 调用方权限范围不足
+- 鉴权服务时间偏差或签名校验失败
 
-## Recommended Checks
+## 推荐检查项
 
-1. inspect token expiration and issuer
-2. validate required scopes and roles
-3. compare app server time with auth provider time
+1. 检查 token 的过期时间、签发方和载荷
+2. 核对接口所需的角色、scope 和权限点
+3. 比较应用服务器时间与鉴权服务时间是否存在偏差

@@ -1,13 +1,13 @@
-# CloudWatch-like Log Checklist
+# CloudWatch 风格日志排查清单
 
-## Query Ideas
+## 查询思路
 
-- filter by service name and exception type
-- compare spikes by 5 minute bins
-- search for the same request id across log groups
+- 先按服务名和异常类型过滤日志
+- 以 5 分钟为粒度对比错误峰值
+- 按相同 request id 或 trace id 串联多个日志组
 
-## Checklist
+## 排查清单
 
-1. correlate logs with metric anomalies
-2. inspect the first failure timestamp
-3. compare before and after deployment
+1. 将日志异常与监控指标波动进行对照
+2. 找到第一条失败日志出现的精确时间
+3. 比较发布前后、配置变更前后的异常差异

@@ -1,19 +1,19 @@
-# Database Connection Diagnosis Guide
+# 数据库连接问题诊断指南
 
-## Common Signals
+## 常见信号
 
-- SQLTransientConnectionException
-- connection pool timeout
-- database not reachable or overloaded
+- `SQLTransientConnectionException`
+- 连接池等待超时
+- 数据库不可达、过载或连接数打满
 
-## Common Root Causes
+## 常见根因
 
-- connection pool exhausted
-- database CPU or connection count too high
-- wrong credentials, endpoint, or network route
+- 连接池已耗尽，空闲连接迟迟无法归还
+- 数据库 CPU、连接数或 I/O 压力过高
+- 用户名、密码、地址、端口或网络路由配置错误
 
-## Recommended Checks
+## 推荐检查项
 
-1. inspect pool usage and wait time
-2. verify database health and max connections
-3. confirm application configuration values
+1. 查看连接池使用率、等待时长和超时数量
+2. 确认数据库实例健康状态、最大连接数和慢查询情况
+3. 检查应用配置是否指向正确实例，以及连接超时参数是否合理
