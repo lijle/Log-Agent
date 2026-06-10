@@ -1,7 +1,7 @@
 """Streamlit 应用入口。
 
 这个文件负责把 Agent、工具、SQLite 记忆库和前端页面串起来。
-你阅读这个文件时，可以把它理解为“把后端能力装配成一个可交互 UI”的地方。
+如果你想快速理解整个项目怎么跑，优先看这里和 agent/react_agent.py。
 """
 
 from __future__ import annotations
@@ -32,17 +32,12 @@ KNOWLEDGE_BASE_DIR = PROJECT_ROOT / "data" / "knowledge_base"
 def build_agent() -> ReActAgent:
     """构建并返回应用使用的 Agent 实例。
 
-    作用：
-    - 加载环境变量
-    - 初始化 SQLite 记忆库
-    - 根据环境变量选择真实 LLM 或 FakeLLM
-    - 注册日志解析、RAG、Memory、报告生成等工具
-
-    输入：
-    - 无
-
-    输出：
-    - ReActAgent：已经完成依赖装配的 Agent，可直接执行 `run`
+    流程：
+    1. 加载环境变量
+    2. 初始化 SQLiteMemory
+    3. 根据环境变量选择真实 LLM 或 FakeLLM
+    4. 注册 log_parser / rag / memory / report 工具
+    5. 返回可直接执行的 ReActAgent
     """
 
     load_dotenv()
@@ -66,18 +61,7 @@ def build_agent() -> ReActAgent:
 
 
 def load_recent_cases(agent: ReActAgent) -> list[dict[str, Any]]:
-    """从 MemoryTool 读取最近的诊断案例。
-
-    作用：
-    - 供左侧边栏展示“历史诊断”
-    - 让用户快速回看最近分析过的问题
-
-    输入：
-    - agent：已经构建好的 Agent，内部要能拿到 `memory_tool`
-
-    输出：
-    - list[dict[str, Any]]：案例列表，每项包含 case_id、created_at、diagnosis_summary 等字段
-    """
+    """读取最近的历史案例，用于侧边栏展示。"""
 
     memory_tool = agent.tool_registry.get_tool("memory_tool")
     result = memory_tool.run({"action": "list_recent_cases", "limit": 5})
@@ -85,18 +69,11 @@ def load_recent_cases(agent: ReActAgent) -> list[dict[str, Any]]:
 
 
 def get_log_input(uploaded_file: Any, pasted_log: str) -> str:
-    """统一整理用户输入的日志文本。
+    """统一处理日志输入来源。
 
-    作用：
-    - 优先读取上传文件中的日志内容
-    - 如果没有上传文件，则使用文本框里粘贴的日志
-
-    输入：
-    - uploaded_file：Streamlit 上传的文件对象，可能为 None
-    - pasted_log：用户在文本框中输入的原始日志
-
-    输出：
-    - str：最终交给 Agent 分析的日志文本
+    优先级：
+    1. 如果用户上传了文件，读取文件内容
+    2. 否则使用文本框里的日志内容
     """
 
     if uploaded_file is not None:
@@ -105,18 +82,7 @@ def get_log_input(uploaded_file: Any, pasted_log: str) -> str:
 
 
 def get_document_title(doc: dict[str, Any]) -> str:
-    """从知识片段中提取可展示的标题。
-
-    作用：
-    - 优先读取 Markdown 一级标题
-    - 如果没有标题，则回退到源文件名
-
-    输入：
-    - doc：RAG 检索返回的文档片段，通常包含 source 和 content
-
-    输出：
-    - str：适合在 UI 中展示的知识标题
-    """
+    """从知识片段中提取 Markdown 标题，供 UI 展示。"""
 
     content = str(doc.get("content", "")).strip()
     for line in content.splitlines():
@@ -127,40 +93,17 @@ def get_document_title(doc: dict[str, Any]) -> str:
 
 
 def format_case_time(created_at: str) -> str:
-    """把数据库中的 ISO 时间格式化为更易读的展示形式。
-
-    作用：
-    - 仅做前端展示处理
-    - 让时间字符串从 `2026-05-31T10:00:00+00:00` 变得更直观
-
-    输入：
-    - created_at：SQLite 中保存的 ISO 时间字符串
-
-    输出：
-    - str：替换掉 `T` 之后的可读时间字符串
-    """
+    """把 ISO 时间格式转成更直观的展示形式。"""
 
     return created_at.replace("T", " ")
 
 
 def main() -> None:
-    """启动 Streamlit 页面并处理整条交互流程。
-
-    作用：
-    - 渲染日志输入区、样例区、历史案例区
-    - 在用户点击“开始分析”后触发 Agent
-    - 展示解析字段、知识检索结果、历史案例和最终报告
-
-    输入：
-    - 无。用户输入由 Streamlit 组件提供
-
-    输出：
-    - 无。结果直接渲染到 Web 页面
-    """
+    """启动 Streamlit 页面，并把 Agent 结果渲染出来。"""
 
     st.set_page_config(page_title="日志诊断 Agent", page_icon="🩺", layout="wide")
     st.title("日志诊断 Agent")
-    st.caption("一个本地可运行的后端日志诊断 Agent MVP，适合学习 Agent、RAG 和排障流程。")
+    st.caption("一个本地可运行的后端日志诊断 Agent MVP，适合学习 ReAct、RAG 和排障流程。")
 
     agent = build_agent()
 
