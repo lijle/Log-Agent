@@ -23,6 +23,8 @@ from tools.rag_tool import RAGTool
 from tools.report_tool import ReportTool
 from tools.tool_registry import ToolRegistry
 
+from agent.langgraph_agent import LangGraphAgent
+
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 DB_PATH = PROJECT_ROOT / "db" / "diagnosis_history.db"
@@ -59,11 +61,17 @@ def build_agent() -> ReActAgent:
         memory=memory_store,
     )
 
+def build_langgraph_agent() -> LangGraphAgent:
+    """构建并返回 LangGraph 版本的 Agent。"""
+    load_dotenv()
+    return LangGraphAgent()
 
-def load_recent_cases(agent: ReActAgent) -> list[dict[str, Any]]:
+
+def load_recent_cases() -> list[dict[str, Any]]:
     """读取最近的历史案例，用于侧边栏展示。"""
 
-    memory_tool = agent.tool_registry.get_tool("memory_tool")
+    memory_store = SQLiteMemory(DB_PATH)
+    memory_tool = MemoryTool(memory_store=memory_store)
     result = memory_tool.run({"action": "list_recent_cases", "limit": 5})
     return result.get("cases", [])
 
@@ -105,11 +113,16 @@ def main() -> None:
     st.title("日志诊断 Agent")
     st.caption("一个本地可运行的后端日志诊断 Agent MVP，适合学习 ReAct、RAG 和排障流程。")
 
-    agent = build_agent()
 
     with st.sidebar:
+        run_mode = st.radio(
+            "运行模式",
+            ["ReAct Agent", "LangGraph Agent"],
+            index=0,
+        )
+
         st.subheader("历史诊断")
-        recent_cases = load_recent_cases(agent)
+        recent_cases = load_recent_cases()
         if recent_cases:
             for case in recent_cases:
                 st.markdown(f"**{case['case_id']}**")
@@ -117,6 +130,13 @@ def main() -> None:
                 st.write(case["diagnosis_summary"])
         else:
             st.info("暂无历史案例。")
+
+
+    if run_mode == "LangGraph Agent":
+        agent = build_langgraph_agent()
+    else:
+        agent = build_agent()
+
 
     left, right = st.columns([1, 1])
 
