@@ -11,6 +11,18 @@ def load_markdown_documents(knowledge_base_dir: Path) -> list[dict[str, str]]:
 
     输出：
     - list[dict[str, str]]：每个元素包含 source 和 content
+
+    返回类似：
+    [
+    {
+        "source": "database_connection_diagnosis.md",
+        "content": "# Database Connection Diagnosis Guide\n..."
+    },
+    {
+        "source": "cloudwatch_log_checklist.md",
+        "content": "# CloudWatch-like Log Checklist\n..."
+    }
+]
     """
 
     documents: list[dict[str, str]] = []
@@ -19,37 +31,56 @@ def load_markdown_documents(knowledge_base_dir: Path) -> list[dict[str, str]]:
     return documents
 
 
+def split_text_with_overlap(text: str, chunk_size: int, overlap: int) -> list[str]:
+    """对单段长文本做带 overlap 的字符级兜底切分。"""
+    chunks: list[str] = []
+    start = 0
+    while start<len(text):
+        end=min(len(text),start+chunk_size)
+        chunks.append(text[start:end])
+        if end == len(text):
+            break
+        start = max(end-overlap, start+1)
+
+    return chunks
+
 def split_documents(
     documents: list[dict[str, str]],
     chunk_size: int = 500,
     overlap: int = 80,
 ) -> list[dict[str, str]]:
-    """把长文档切成较短的知识片段。
-
-    作用：
-    - 让后续 TF-IDF 检索粒度更细
-    - 通过 overlap 保留片段上下文连续性
-
-    输入：
-    - documents：原始文档列表
-    - chunk_size：单个片段的最大字符数
-    - overlap：相邻片段之间的重叠字符数
-
-    输出：
-    - list[dict[str, str]]：切分后的片段列表
-    """
+    """把长文档优先按段落切分，过长段落再做字符级兜底切分。"""
 
     chunks: list[dict[str, str]] = []
+
     for doc in documents:
         content = doc["content"].strip()
         if not content:
             continue
-        start = 0
-        while start < len(content):
-            end = min(len(content), start + chunk_size)
-            chunk = content[start:end]
-            chunks.append({"source": doc["source"], "content": chunk})
-            if end == len(content):
-                break
-            start = max(end - overlap, start + 1)
+
+        paragraphs = [item.strip() for item in content.split("\n\n") if item.strip()]
+
+        for paragraph in paragraphs:
+            if len(paragraph) <= chunk_size:
+                chunks.append(
+                    {
+                        "source": doc["source"],
+                        "content": paragraph,
+                    }
+                )
+                continue
+
+            fallback_chunks = split_text_with_overlap(
+                text=paragraph,
+                chunk_size=chunk_size,
+                overlap=overlap,
+            )
+            for chunk in fallback_chunks:
+                chunks.append(
+                    {
+                        "source": doc["source"],
+                        "content": chunk,
+                    }
+                )
+
     return chunks

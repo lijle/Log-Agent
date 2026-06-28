@@ -178,17 +178,76 @@ def parse_log_node(state: GraphState) -> dict[str, Any]:
         "trace": current_trace + [trace_entry],
     }
 
+def extract_rag_keywords(parsed_result: dict[str, Any]) -> list[str]:
+    """从日志解析结果中提取更适合知识库检索的补充关键词。用来构建更好的query"""
+    fields = parsed_result.get("extracted_fields", {})
+    error_message = str(fields.get("error_message", "")).lower()
+
+    keywords: list[str] = []
+    if "timeout" in error_message:
+        keywords.append("timeout")
+    if "connection" in error_message:
+        keywords.append("connection")
+    if "connection is not available" in error_message:
+        keywords.append("database connection unavailable")
+    if "hikaripool" in error_message or "pool" in error_message:
+        keywords.append("connection pool")
+    if "auth" in error_message or "token" in error_message:
+        keywords.append("authentication")
+    if "nullpointerexception" in error_message or "null pointer" in error_message:
+        keywords.append("null pointer")
+    if "refused" in error_message:
+        keywords.append("connection refused")
+    # 去重，同时保持顺序
+    deduplicated: list[str] = []
+    for item in keywords:
+        if item and item not in deduplicated:
+            deduplicated.append(item)
+
+    return deduplicated
 
 def build_rag_query(parsed_result: dict[str, Any]) -> str:
-    """基于日志解析结果构造知识库检索语句。"""
+    """基于日志解析结果构造更适合知识库检索的查询语句。"""
     fields = parsed_result.get("extracted_fields", {})
-    parts=[
-        parsed_result.get("log_summary",""),
-        fields.get("exception_type",""),
-        fields.get("error_message",""),
-        str(fields.get("http_status_code","")),
-    ]
-    return " ".join(part for part in parts if part)
+
+    exception_type = str(fields.get("exception_type", "")).strip()
+    error_message = str(fields.get("error_message", "")).strip()
+    service_name = str(fields.get("service_name", "")).strip()
+    status_code = fields.get("http_status_code")
+    log_summary = str(parsed_result.get("log_summary", "")).strip()
+
+    keyword_hints = extract_rag_keywords(parsed_result)
+
+    parts: list[str] = []
+
+    if exception_type:
+        parts.append(exception_type)
+    condensed_error_message = error_message
+    if ":" in condensed_error_message:
+        condensed_error_message = condensed_error_message.split(":", 1)[1].strip()
+    if condensed_error_message:
+        parts.append(condensed_error_message)
+    if service_name:
+        parts.append(service_name)
+
+    parts.extend(keyword_hints)
+
+    # 只有在关键信息较少时，才回退使用更长的日志摘要做兜底。
+    if log_summary and len(parts) < 3:
+        parts.append(log_summary)
+    if status_code:
+        parts.append(f"http {status_code}")
+    # 去重并去空
+    normalized_parts: list[str] = []
+    seen: set[str] = set()
+    for part in parts:
+        cleaned = part.strip()
+        key = cleaned.lower()
+        if cleaned and key not in seen:
+            normalized_parts.append(cleaned)
+            seen.add(key)
+
+    return " ".join(normalized_parts)
 
 def retrieve_knowledge_node(state: GraphState) -> dict[str, Any]:
     """LangGraph 节点：检索知识库。
@@ -205,12 +264,12 @@ def retrieve_knowledge_node(state: GraphState) -> dict[str, Any]:
     query = build_rag_query(parsed_result)
 
     rag_tool = RAGTool(knowledge_base_dir=KNOWLEDGE_BASE_DIR)
-    rag_result = rag_tool.run({"query": query, "top_k": 4})
+    rag_result = rag_tool.run({"query": query, "top_k": 4, "candidate_k": 8})
 
     trace_entry = {
         "thought": "已经拿到异常类型、错误信息和日志摘要，检索知识库补充排障背景。",
         "action": "rag_tool",
-        "action_input": {"query": query, "top_k": 4},
+        "action_input": {"query": query, "top_k": 4, "candidate_k": 8},
         "observation": rag_result,
     }
     current_trace = state.get("trace", [])
@@ -383,7 +442,7 @@ def generate_report_node(state: GraphState) -> dict[str, Any]:
         "raw_log": state.get("user_input", ""),
         "parsed_result": state.get("parsed_result", {}),
         "rag_result": state.get("rag_result", {}),
-        "memory_result": state.get("memory_result", {generate_report_node}),
+        "memory_result": state.get("memory_result", {}),
     }
 
     report_result = report_tool.run(report_input)

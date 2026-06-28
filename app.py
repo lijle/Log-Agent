@@ -50,7 +50,7 @@ def build_agent() -> ReActAgent:
 
     registry = ToolRegistry()
     registry.register_tool(LogParserTool())
-    registry.register_tool(RAGTool(knowledge_base_dir=KNOWLEDGE_BASE_DIR))
+    registry.register_tool(RAGTool(knowledge_base_dir=KNOWLEDGE_BASE_DIR, default_top_k=4))
     registry.register_tool(MemoryTool(memory_store=memory_store))
     registry.register_tool(ReportTool(llm=llm, memory_store=memory_store))
 

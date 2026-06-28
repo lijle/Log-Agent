@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import numpy as np
+from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -67,6 +69,59 @@ class LocalTfidfVectorStore:
                     "source": doc["source"],
                     "content": doc["content"],
                     "score": score,
+                    "retriever": "sparse",
+                }
+            )
+        return results
+
+
+class LocalEmbeddingVectorStore:
+    """基于 sentence-transformers 的本地向量检索实现。"""
+    def __init__(
+        self,
+        model_name: str = "paraphrase-multilingual-MiniLM-L12-v2",
+    ) -> None:
+        self.model_name = model_name
+        self.model = SentenceTransformer(model_name)
+        self.documents: list[dict[str, Any]] = []
+        self.embeddings: np.ndarray | None = None
+
+    def build(self, documents: list[dict[str, Any]]) -> None:
+        self.documents = documents
+        corpus = [doc["content"] for doc in documents]
+        if not corpus:
+            self.embeddings = None
+            return
+
+        self.embeddings = self.model.encode(
+            corpus,
+            normalize_embeddings=True,
+            convert_to_numpy=True,
+        )
+
+    def search(self, query: str, top_k: int = 4) -> list[dict[str, Any]]:
+        if self.embeddings is None or not self.documents:
+            return []
+        query_embedding = self.model.encode(
+            [query],
+            normalize_embeddings=True,
+            convert_to_numpy=True,
+        )[0]
+        scores = np.dot(self.embeddings, query_embedding)
+        ranked_indices = scores.argsort()[::-1][:top_k]
+
+        results: list[dict[str, Any]] = []
+        for idx in ranked_indices:
+            score = float(scores[idx])
+            if score <= 0:
+                continue
+            doc = self.documents[idx]
+            results.append(
+                {
+                    "source": doc["source"],
+                    "content": doc["content"],
+                    "score": score,
+                    "retriever": "dense",
                 }
             )
         return results

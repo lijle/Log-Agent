@@ -387,13 +387,59 @@ class ReActAgent(BaseAgent):
         """
 
         fields = parsed_result.get("extracted_fields", {})
-        parts = [
-            parsed_result.get("log_summary", ""),
-            fields.get("exception_type", ""),
-            fields.get("error_message", ""),
-            str(fields.get("http_status_code", "")),
-        ]
-        return " ".join(part for part in parts if part)
+        exception_type = str(fields.get("exception_type", "")).strip()
+        error_message = str(fields.get("error_message", "")).strip()
+        service_name = str(fields.get("service_name", "")).strip()
+        status_code = fields.get("http_status_code")
+        log_summary = str(parsed_result.get("log_summary", "")).strip()
+
+        keyword_hints: list[str] = []
+        lower_error_message = error_message.lower()
+        if "timeout" in lower_error_message:
+            keyword_hints.append("timeout")
+        if "connection" in lower_error_message:
+            keyword_hints.append("connection")
+        if "connection is not available" in lower_error_message:
+            keyword_hints.append("database connection unavailable")
+        if "hikaripool" in lower_error_message or "pool" in lower_error_message:
+            keyword_hints.append("connection pool")
+        if "auth" in lower_error_message or "token" in lower_error_message:
+            keyword_hints.append("authentication")
+        if "nullpointerexception" in lower_error_message or "null pointer" in lower_error_message:
+            keyword_hints.append("null pointer")
+        if "refused" in lower_error_message:
+            keyword_hints.append("connection refused")
+
+        parts: list[str] = []
+        if exception_type:
+            parts.append(exception_type)
+
+        condensed_error_message = error_message
+        if ":" in condensed_error_message:
+            condensed_error_message = condensed_error_message.split(":", 1)[1].strip()
+        if condensed_error_message:
+            parts.append(condensed_error_message)
+
+        if service_name:
+            parts.append(service_name)
+
+        parts.extend(keyword_hints)
+
+        if log_summary and len(parts) < 3:
+            parts.append(log_summary)
+        if status_code:
+            parts.append(f"http {status_code}")
+
+        normalized_parts: list[str] = []
+        seen: set[str] = set()
+        for part in parts:
+            cleaned = str(part).strip()
+            key = cleaned.lower()
+            if cleaned and key not in seen:
+                normalized_parts.append(cleaned)
+                seen.add(key)
+
+        return " ".join(normalized_parts)
 
     @staticmethod
     def _build_memory_query(parsed_result: dict[str, Any]) -> str:
