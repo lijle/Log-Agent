@@ -1,0 +1,15 @@
+{
+  "case_id": "db_connection_case",
+  "raw_log": "2026-05-29 12:44:55,902 ERROR service=user-service trace_id=trc-db-19 status=500\nDatabase operation failed: SQLTransientConnectionException: HikariPool-1 - Connection is not available, request timed out after 30000ms\ndb_host=db-primary namespace=prod",
+  "expected_exception_type": "SQLTransientConnectionException",
+  "expected_root_cause_keywords": [
+    "连接池",
+    "数据库连接",
+    "超时"
+  ],
+  "expected_required_evidence": [
+    "log_field",
+    "log_line",
+    "rag_chunk"
+  ]
+}

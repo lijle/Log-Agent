@@ -3,9 +3,13 @@ from __future__ import annotations
 from typing import Any
 
 import numpy as np
-from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+
+try:
+    from sentence_transformers import SentenceTransformer
+except Exception:  # pragma: no cover - import availability depends on local env
+    SentenceTransformer = None
 
 
 class LocalTfidfVectorStore:
@@ -82,14 +86,19 @@ class LocalEmbeddingVectorStore:
         model_name: str = "paraphrase-multilingual-MiniLM-L12-v2",
     ) -> None:
         self.model_name = model_name
-        self.model = SentenceTransformer(model_name)
+        self.model = None
+        if SentenceTransformer is not None:
+            try:
+                self.model = SentenceTransformer(model_name, local_files_only=True)
+            except Exception:
+                self.model = None
         self.documents: list[dict[str, Any]] = []
         self.embeddings: np.ndarray | None = None
 
     def build(self, documents: list[dict[str, Any]]) -> None:
         self.documents = documents
         corpus = [doc["content"] for doc in documents]
-        if not corpus:
+        if not corpus or self.model is None:
             self.embeddings = None
             return
 
@@ -100,7 +109,7 @@ class LocalEmbeddingVectorStore:
         )
 
     def search(self, query: str, top_k: int = 4) -> list[dict[str, Any]]:
-        if self.embeddings is None or not self.documents:
+        if self.model is None or self.embeddings is None or not self.documents:
             return []
         query_embedding = self.model.encode(
             [query],

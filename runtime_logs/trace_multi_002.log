@@ -1,0 +1,4 @@
+2026-07-16 23:00:00,001 INFO service=shp-service trace_id=trace-multi-002 span_id=span-shp-002 request_id=req-multi-002 status=200 message="received transfer request"
+2026-07-16 23:00:00,020 INFO service=papi-service trace_id=trace-multi-002 span_id=span-papi-002 parent_span_id=span-shp-002 request_id=req-multi-002 status=200 message="received request from shp-service"
+2026-07-16 23:00:30,021 ERROR service=papi-service trace_id=trace-multi-002 span_id=span-papi-002 parent_span_id=span-shp-002 request_id=req-multi-002 status=504 exception=ReadTimeoutException message="database request timed out after 30000ms"
+2026-07-16 23:00:30,031 ERROR service=shp-service trace_id=trace-multi-002 span_id=span-shp-002 request_id=req-multi-002 status=500 exception=DownstreamServiceException message="papi-service request failed"

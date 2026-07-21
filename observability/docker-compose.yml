@@ -1,0 +1,66 @@
+services:
+  loki:
+    image: grafana/loki:2.9.8
+    container_name: log-agent-loki
+    command: -config.file=/etc/loki/local-config.yml
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki-config.yml:/etc/loki/local-config.yml:ro
+      - loki-data:/loki
+
+  promtail:
+    image: grafana/promtail:2.9.8
+    container_name: log-agent-promtail
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+    volumes:
+      - ./promtail-config.yml:/etc/promtail/config.yml:ro
+      - ../runtime_logs:/var/log/mock-app:ro
+
+  tempo:
+    image: grafana/tempo:2.6.1
+    container_name: log-agent-tempo
+    command:
+      - -config.file=/etc/tempo/tempo-config.yml
+    ports:
+      - "3200:3200"
+    volumes:
+      - ./tempo-config.yml:/etc/tempo/tempo-config.yml:ro
+      - tempo-data:/var/tempo
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.116.1
+    container_name: log-agent-otel-collector
+    command:
+      - --config=/etc/otelcol-contrib/config.yml
+    depends_on:
+      - tempo
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "13133:13133"
+    volumes:
+      - ./otel-collector-config.yml:/etc/otelcol-contrib/config.yml:ro
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    container_name: log-agent-grafana
+    depends_on:
+      - loki
+      - tempo
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+
+volumes:
+  loki-data:
+  tempo-data:
+  grafana-data:

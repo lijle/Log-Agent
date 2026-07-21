@@ -19,11 +19,37 @@ from agent.react_parser import parse_react_output
 from agent.react_prompts import REACT_SYSTEM_PROMPT, build_react_user_prompt
 from agent.react_schema import ReActDecision
 from llm.openai_compatible_llm import OpenAICompatibleLLM
-
+import re
+from tools.tempo_query_tool import TempoQueryTool
 
 KNOWLEDGE_BASE_DIR = Path(__file__).resolve().parent.parent / "data" / "knowledge_base"
 DB_PATH = Path(__file__).resolve().parent.parent / "db" / "diagnosis_history.db"
 
+def extract_otel_trace_id(
+    state: GraphState,
+) -> str:
+    """从日志解析结果中取得标准 OpenTelemetry Trace ID。"""
+    parsed_result = state.get(
+        "parsed_result",
+        {},
+    )
+
+    fields = parsed_result.get(
+        "extracted_fields",
+        {},
+    )
+
+    trace_id = str(
+        fields.get("trace_id", "")
+    ).strip().lower()
+
+    if re.fullmatch(
+        r"[0-9a-f]{16}|[0-9a-f]{32}",
+        trace_id,
+    ):
+        return trace_id
+
+    return ""
 
 def collect_missing_evidence(state: GraphState) -> list[str]:
     """根据当前状态评估还缺哪些关键证据。"""
@@ -40,19 +66,45 @@ def collect_missing_evidence(state: GraphState) -> list[str]:
         missing.append("knowledge")
     if not state.get("memory_result", {}).get("cases"):
         missing.append("history")
+    trace_id = extract_otel_trace_id(state)
+
+    if trace_id:
+        tempo_spans = (
+            state
+            .get("tempo_result", {})
+            .get("spans", [])
+        )
+
+        if not tempo_spans:
+            missing.append("trace_context")
 
     return missing
 
-def decide_next_action_with_rules(state: GraphState) -> str:
-    """根据当前状态决定下一步节点。
+def decide_next_action_with_rules(
+    state: GraphState,
+) -> str:
+    """LLM 决策失败时，使用规则选择下一节点。"""
+    trace_id = extract_otel_trace_id(state)
 
-    当前先使用规则版决策，后面会升级成 Agent / LLM 决策。
-    """
-    rag_result = state.get("rag_result", {})
-    memory_result = state.get("memory_result", {})
+    tempo_result = state.get(
+        "tempo_result",
+        {},
+    )
+    rag_result = state.get(
+        "rag_result",
+        {},
+    )
+    memory_result = state.get(
+        "memory_result",
+        {},
+    )
+
+    if trace_id and not tempo_result:
+        return "retrieve_trace_node"
 
     if not rag_result:
         return "retrieve_knowledge_node"
+
     if not memory_result:
         return "search_memory_node"
 
@@ -176,6 +228,83 @@ def parse_log_node(state: GraphState) -> dict[str, Any]:
         "missing_evidence": collect_missing_evidence(temp_state),
         "iteration_count": state.get("iteration_count", 0) + 1,
         "trace": current_trace + [trace_entry],
+    }
+
+def retrieve_trace_node(
+    state: GraphState,
+) -> dict[str, Any]:
+    """根据解析出的 Trace ID 查询 Tempo 调用链。
+
+    输入：
+    - state["parsed_result"] 中的 trace_id
+
+    输出：
+    - tempo_result: Span、服务和调用链时间线
+    - missing_evidence: 更新后的缺失证据
+    - trace: 本次工具调用记录
+    """
+    trace_id = extract_otel_trace_id(
+        state
+    )
+
+    if not trace_id:
+        tempo_result = {
+            "success": False,
+            "trace_id": "",
+            "spans": [],
+            "error_spans": [],
+            "service_names": [],
+            "timeline": [],
+            "timeline_text": "",
+            "error": (
+                "当前日志中没有标准 "
+                "OpenTelemetry Trace ID。"
+            ),
+        }
+    else:
+        tempo_tool = TempoQueryTool()
+
+        tempo_result = tempo_tool.run(
+            {
+                "trace_id": trace_id,
+            }
+        )
+
+    trace_entry = {
+        "thought": (
+            "日志中存在标准 Trace ID，"
+            "查询 Tempo 获取跨服务调用链和错误 Span。"
+        ),
+        "action": "tempo_query_tool",
+        "action_input": {
+            "trace_id": trace_id,
+        },
+        "observation": tempo_result,
+    }
+
+    current_trace = state.get(
+        "trace",
+        [],
+    )
+
+    temp_state: GraphState = {
+        **state,
+        "tempo_result": tempo_result,
+    }
+
+    return {
+        "tempo_result": tempo_result,
+        "missing_evidence": (
+            collect_missing_evidence(
+                temp_state
+            )
+        ),
+        "iteration_count": (
+            state.get("iteration_count", 0) + 1
+        ),
+        "trace": (
+            current_trace + [trace_entry]
+        ),
     }
 
 def extract_rag_keywords(parsed_result: dict[str, Any]) -> list[str]:

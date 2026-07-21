@@ -1,0 +1,2 @@
+2026-07-16 12:00:00,020 INFO service=papi-service trace_id=trace-multi-001 span_id=span-papi-001 parent_span_id=span-shp-001 request_id=req-multi-001 status=200 message="received request from shp-service"
+2026-07-16 12:00:30,021 ERROR service=papi-service trace_id=trace-multi-001 span_id=span-papi-001 parent_span_id=span-shp-001 request_id=req-multi-001 status=504 exception=ReadTimeoutException message="database request timed out after 30000ms"

@@ -6,7 +6,7 @@ from typing import Any
 from llm.base_llm import BaseLLM
 from memory.sqlite_memory import SQLiteMemory
 from tools.base_tool import BaseTool
-
+from diagnosis import Evidence, RootCauseCandidate
 
 class ReportTool(BaseTool):
     """诊断报告生成工具。
@@ -82,6 +82,14 @@ class ReportTool(BaseTool):
         troubleshooting_steps = self._infer_troubleshooting_steps(documents, fields)
         suggested_queries = self._build_queries(fields)
         confidence_score = self._estimate_confidence(fields, documents)
+        root_cause_candidates = self._build_root_cause_candidates(
+            fields=fields,
+            documents=documents,
+            evidence_lines=parsed_result.get("evidence_lines", []),
+            root_causes=root_causes,
+            troubleshooting_steps=troubleshooting_steps,
+            confidence_score=confidence_score,
+        )
 
         deterministic_report = self._render_markdown(
             summary=summary,
@@ -108,6 +116,7 @@ class ReportTool(BaseTool):
         return {
             "diagnosis_summary": diagnosis_summary,
             "root_causes": root_causes,
+            "root_cause_candidates": root_cause_candidates,
             "troubleshooting_steps": troubleshooting_steps,
             "suggested_queries": suggested_queries,
             "confidence_score": confidence_score,
@@ -300,6 +309,84 @@ class ReportTool(BaseTool):
         if documents:
             score += min(0.15, len(documents) * 0.03)
         return round(min(score, 0.95), 2)
+
+    def _build_root_cause_candidates(
+        self,
+        fields: dict[str, Any],
+        documents: list[dict[str, Any]],
+        evidence_lines: list[str],
+        root_causes: list[str],
+        troubleshooting_steps: list[str],
+        confidence_score: float,
+    ) -> list[dict[str, Any]]:
+        """生成带证据的根因候选，供评估和后续可解释展示使用。"""
+
+        evidence_list: list[Evidence] = []
+
+        # 1. 把结构化字段转成 Evidence 对象
+        for key in ["service_name", "exception_type", "error_message", "http_status_code"]:
+            value = fields.get(key)
+            if value:
+                evidence_item = Evidence(
+                    evidence_type="log_field",
+                    content=f"{key}={value}",
+                    source="parsed_log",
+                    score=None,
+                    metadata={"field": key},
+                )
+                evidence_list.append(evidence_item)
+
+        # 2. 把关键原始日志行转成 Evidence 对象
+        for line in evidence_lines[:3]:
+            evidence_item = Evidence(
+                evidence_type="log_line",
+                content=line,
+                source="raw_log",
+                score=None,
+                metadata={},
+            )
+            evidence_list.append(evidence_item)
+
+        # 3. 把知识库片段转成 Evidence 对象
+        for doc in documents[:3]:
+            evidence_item = Evidence(
+                evidence_type="rag_chunk",
+                content=str(doc.get("content", ""))[:240],
+                source=str(doc.get("source", "knowledge_base")),
+                score=doc.get("rerank_score", doc.get("score")),
+                metadata={
+                    "retrievers": doc.get("retrievers", []),
+                    "base_score": doc.get("base_score"),
+                    "fusion_score": doc.get("fusion_score"),
+                },
+            )
+            evidence_list.append(evidence_item)
+
+        # 4. 先整理缺失证据
+        missing_evidence: list[str] = []
+        if not fields.get("service_name"):
+            missing_evidence.append("service_name")
+        if not fields.get("exception_type"):
+            missing_evidence.append("exception_type")
+        if not fields.get("error_message"):
+            missing_evidence.append("error_message")
+        if not documents:
+            missing_evidence.append("rag_chunk")
+
+        # 5. 为每个 root cause 生成一个 RootCauseCandidate 对象
+        candidates: list[RootCauseCandidate] = []
+        for index, cause in enumerate(root_causes):
+            candidate = RootCauseCandidate(
+                hypothesis=cause,
+                evidence=evidence_list,
+                confidence=round(max(0.1, confidence_score - index * 0.08), 2),
+                missing_evidence=missing_evidence,
+                next_actions=troubleshooting_steps[:3],
+            )
+            candidates.append(candidate)
+
+        # 6. 最后统一转成 dict，方便 JSON / Streamlit / eval 使用
+        return [candidate.to_dict() for candidate in candidates]
 
     def _render_markdown(
         self,

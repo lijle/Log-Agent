@@ -1,0 +1,2 @@
+2026-07-16 12:00:00,001 INFO service=shp-service trace_id=trace-multi-001 span_id=span-shp-001 request_id=req-multi-001 status=200 message="received transfer request"
+2026-07-16 12:00:30,031 ERROR service=shp-service trace_id=trace-multi-001 span_id=span-shp-001 request_id=req-multi-001 status=500 exception=DownstreamServiceException message="papi-service request failed"

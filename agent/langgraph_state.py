@@ -14,6 +14,7 @@ class GraphState(TypedDict, total=False):
 
     # 各阶段中间结果
     parsed_result: dict[str, Any]
+    tempo_result: dict[str, Any]
     rag_result: dict[str, Any]
     memory_result: dict[str, Any]
     report_result: dict[str, Any]

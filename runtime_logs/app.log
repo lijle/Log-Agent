@@ -1,0 +1,7 @@
+2026-07-12 10:15:01,120 INFO service=mock-transfer-api trace_id=trc-demo-001 status=200 message="transfer request accepted"
+2026-07-12 10:15:03,482 ERROR service=mock-transfer-api trace_id=trc-demo-002 request_id=req-demo-002 status=500
+Database operation failed: SQLTransientConnectionException: HikariPool-1 - Connection is not available, request timed out after 30000ms
+2026-07-12 10:15:05,904 WARN service=mock-transfer-api trace_id=trc-demo-003 status=504
+Downstream call failed: ReadTimeoutException: timeout while calling account-service after 5000ms
+2026-07-12 10:15:08,231 ERROR service=mock-transfer-api correlation_id=cor-demo-004 status=401
+Authentication failed: AuthFailedException: token expired or missing required permission

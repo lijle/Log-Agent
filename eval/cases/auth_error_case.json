@@ -1,0 +1,15 @@
+{
+  "case_id": "auth_error_case",
+  "raw_log": "2026-05-29 13:28:40,210 WARN service=auth-gateway request_id=req-auth-22 status=401\nAuthorization failed: AuthFailedException: invalid bearer token signature\npath=/api/orders method=POST client_app=web-portal",
+  "expected_exception_type": "AuthFailedException",
+  "expected_root_cause_keywords": [
+    "认证",
+    "令牌",
+    "权限"
+  ],
+  "expected_required_evidence": [
+    "log_field",
+    "log_line",
+    "rag_chunk"
+  ]
+}
